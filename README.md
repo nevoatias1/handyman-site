@@ -214,3 +214,11 @@ Uploads accept JPEG, PNG, WebP, or HEIC signatures, independent of client filena
 Cloudinary and the database cannot share an atomic transaction. Upload rollbacks attempt compensating remote deletion. Photo deletion calls Cloudinary first and retains the database record if that call fails. A rare database commit failure after successful remote deletion, process crash, or failed rollback cleanup can require reconciliation. No remote exception text or credentials are returned to clients.
 
 Verification uses `.\\mvnw.cmd verify`. Gallery tests cover auth/CSRF, disguised file types, oversize/count limits, category delete conflicts, transformations/URLs, remote deletion, failure handling, and anonymous public reads.
+
+## Local SEO
+
+Set `VITE_SITE_URL` in `frontend/.env.local` to the eventual public HTTP(S) origin, without a path, query, or fragment. `frontend/.env.example` documents the reserved placeholder `https://example.invalid`; no real domain is configured. Replace the placeholder before publishing and rebuild.
+
+The Vite SEO plugin reads `src/config/business.ts` and writes the title, description, canonical, Open Graph/Twitter tags, and Plumber JSON-LD directly into the built HTML. It also regenerates `public/robots.txt`, `public/sitemap.xml`, and the static 1200x630 `public/og-image.png`, all copied to `dist/`. These generated public files should be regenerated through the build rather than edited manually. Only the stated service areas are included; no address, ratings, or reviews are invented.
+
+Run `npm run build`, `npm run verify:seo`, and `npm run lint -- --deny-warnings` from `frontend/`. The verification parses the built JSON-LD, checks crawler files and image dimensions, and renders the homepage server-side to audit headings and telephone links. Metadata is static; the interactive homepage remains a React app. Admin noindex behavior and gallery behavior are preserved.
