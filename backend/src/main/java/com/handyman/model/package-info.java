@@ -1,2 +1,2 @@
-/** Domain entities will be added in a later phase. */
+/** Gallery persistence entities. */
 package com.handyman.model;

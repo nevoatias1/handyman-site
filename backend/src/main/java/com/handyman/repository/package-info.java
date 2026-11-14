@@ -1,2 +1,2 @@
-/** Spring Data repositories will be added when domain persistence is introduced. */
+/** Gallery persistence repositories. */
 package com.handyman.repository;

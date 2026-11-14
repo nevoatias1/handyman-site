@@ -66,7 +66,7 @@ Set these environment variables in the backend process environment:
 - `DB_USERNAME`: the database user
 - `DB_PASSWORD`: the database password
 
-Then run `./mvnw spring-boot:run`, or build with `./mvnw verify` and run `java -jar target/handyman-backend-0.0.1-SNAPSHOT.jar`. Use `.\mvnw.cmd` on Windows. Supply environment values through your shell or runtime secret manager; Spring Boot does not automatically load .env files. No production credentials are stored in this project. Production schema handling uses `validate`; migrations can be introduced when entities are added.
+Then run `./mvnw spring-boot:run`, or build with `./mvnw verify` and run `java -jar target/handyman-backend-0.0.1-SNAPSHOT.jar`. Use `.\mvnw.cmd` on Windows. Supply environment values through your shell or runtime secret manager; Spring Boot does not automatically load .env files. No production credentials are stored in this project. Schema migrations are managed by Flyway; Hibernate validates the migrated schema.
 
 For a future production frontend, serve the frontend and `/api` from the same origin through a reverse proxy. Deployment configuration is outside this scaffold.
 
@@ -106,7 +106,7 @@ handyman-site/
         └── pages/Home.tsx
 ```
 
-The model and repository packages contain documentation placeholders. The public homepage and single-admin authentication are implemented; gallery work remains for a later phase.
+The model and repository packages contain gallery entities and repositories. The public homepage and single-admin authentication are implemented; the gallery backend is implemented, with its frontend reserved for a later phase.
 
 ## Local development login
 
@@ -166,9 +166,51 @@ Security behavior:
 - GET `/api/auth/csrf` issues the CSRF cookie and returns its token. The API helper sends credentials and an `X-XSRF-TOKEN` header on state-changing requests, fetching a fresh token first. Login and logout require CSRF too. Tokens are cleared on login/logout.
 - Session cookies are HttpOnly, SameSite=Strict, cookie-only (no URL session IDs), and Secure in prod. Production requires HTTPS and a same-origin frontend/API. Sessions expire after 30 minutes of inactivity. Login changes any existing session ID; logout invalidates the session.
 - The CSRF cookie is readable by JavaScript, SameSite=Strict, and Secure in prod. It is separate from the HttpOnly session cookie.
-- Only the Vite dev origin has CORS access: GET for public APIs, and GET/POST plus credentials and the CSRF header for auth APIs. Admin requests use the Vite proxy; prod does not enable CORS.
+- Only the Vite dev origin has CORS access: GET for public APIs, GET/POST for auth APIs, and GET/POST/PUT/PATCH/DELETE for admin APIs with credentials and the CSRF header. Admin requests use the Vite proxy; prod does not enable CORS.
 - Five failed credential attempts per connection IP within a rolling 15 minutes are allowed; subsequent attempts receive JSON 429 and Retry-After. Success clears the failure count for that IP. Counts are in memory, per process, and reset on restart. Expired entries are evicted on each login attempt. At the hard cap of 10,000 tracked IPs, new IPs receive 429 until capacity is freed by expiry or a tracked IP logging in successfully; active limits are never evicted to admit new IPs. Forwarded headers are not trusted. A reverse proxy must preserve distinct client IPs through trusted server configuration before deployment.
 - Anonymous protected requests return JSON 401, forbidden/invalid CSRF requests JSON 403. There is no HTML login page or redirect.
 - Public API GET routes remain public, with admin routes and current-user lookup explicitly protected first. Other unmatched requests are denied.
 
 Verification: `.\mvnw.cmd verify`, `npm run build`, and `npm run lint`. Auth integration tests exercise real CSRF cookies/headers, successful login, wrong passwords, anonymous access, session ID rotation, rate limits, and logout invalidation.
+
+## Gallery backend (Phase 5a)
+
+Flyway now owns the schema in both H2 dev and PostgreSQL prod; Hibernate uses `ddl-auto: validate`. V1 creates `categories` and `photos`; V2 seeds the five initial categories. Use a new/empty database for the first migration; no baseline-on-migrate is enabled. H2 remains in-memory, so dev data is lost on restart.
+
+- `categories`: identity id, name (120), unique immutable slug (100, lowercase ASCII words separated by hyphens), nonnegative sort_order, created_at (UTC timestamp).
+- `photos`: identity id, required category_id foreign key, unique cloudinary_public_id (255), optional caption (200), nonnegative sort_order, created_at.
+- A category with photos cannot be deleted (409). Slugs remain stable on rename so existing Cloudinary folders keep their meaning.
+
+Configure only `CLOUDINARY_URL` for Cloudinary. In dev, put `CLOUDINARY_URL: '<your Cloudinary connection URL>'` at the top level of the same ignored `backend/config/application-dev-local.yml`. A blank placeholder has been added locally; uploads return 503 until configured. Production requires a valid `CLOUDINARY_URL` environment variable and fails startup if missing. No Cloudinary credentials are exposed in API responses. Tests use a mocked uploader and make no network uploads.
+
+Public endpoints:
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | /api/categories | Ordered category metadata |
+| GET | /api/photos?category=plumbing | Photos in a category; omit category to list all |
+ 
+Photo responses contain `id`, `url`, `thumbUrl`, `caption`. URLs use HTTPS with `f_auto,q_auto`; thumbnails limit width to 600px.
+
+Admin endpoints (ADMIN session + CSRF required):
+
+| Method | Path | Body |
+| --- | --- | --- |
+| POST | /api/admin/categories | JSON name, slug |
+| PATCH | /api/admin/categories/{id} | JSON name |
+| DELETE | /api/admin/categories/{id} | None |
+| PUT | /api/admin/categories/reorder | JSON ids (all category IDs in desired order) |
+| POST | /api/admin/photos | multipart categoryId and repeated files parts |
+| PATCH | /api/admin/photos/{id} | JSON caption (null clears it) |
+| DELETE | /api/admin/photos/{id} | None |
+| PUT | /api/admin/categories/{id}/photos/reorder | JSON ids (all photos in that category) |
+
+Reorder requests reject missing, duplicate, unknown, or cross-category IDs. An empty category accepts an empty photo order.
+
+Fetch `/api/auth/csrf` and send its token as `X-XSRF-TOKEN` with the session cookies for mutations, including multipart uploads. Let the HTTP client generate the multipart Content-Type boundary. Admin writes use a same-origin frontend/API or the Vite proxy; existing dev CORS restrictions are preserved. Anonymous admin writes return JSON 401; authenticated writes without CSRF return JSON 403.
+
+Uploads accept JPEG, PNG, WebP, or HEIC signatures, independent of client filename and Content-Type. Files are limited to 10 MiB each and 10 per request. Servlet configuration permits 101 MiB including multipart overhead and 11 parts (10 files + categoryId); application validation enforces the file count and per-file size too. Cloudinary verifies the image contents during upload. Storage names are random UUIDs inside `handyman-site/<category-slug>`; an incoming `c_limit,w_2000,h_2000` transformation caps both dimensions without upscaling.
+
+Cloudinary and the database cannot share an atomic transaction. Upload rollbacks attempt compensating remote deletion. Photo deletion calls Cloudinary first and retains the database record if that call fails. A rare database commit failure after successful remote deletion, process crash, or failed rollback cleanup can require reconciliation. No remote exception text or credentials are returned to clients.
+
+Verification uses `.\\mvnw.cmd verify`. Gallery tests cover auth/CSRF, disguised file types, oversize/count limits, category delete conflicts, transformations/URLs, remote deletion, failure handling, and anonymous public reads.

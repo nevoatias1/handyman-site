@@ -80,7 +80,12 @@ public class SecurityConfig {
                 .anyRequest().denyAll())
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, ex) -> error(response, 401, "נדרשת התחברות"))
-                .accessDeniedHandler((request, response, ex) -> error(response, 403, "הבקשה אינה מורשית")))
+                .accessDeniedHandler((request, response, ex) -> {
+                    var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                    boolean anonymous = auth == null || auth instanceof AnonymousAuthenticationToken;
+                    if (anonymous && request.getRequestURI().startsWith(request.getContextPath()+"/api/admin/")) error(response, 401, "נדרשת התחברות");
+                    else error(response, 403, "הבקשה אינה מורשית");
+                }))
             .logout(logout -> logout.logoutUrl("/api/auth/logout")
                 .invalidateHttpSession(true).clearAuthentication(true).deleteCookies("JSESSIONID")
                 .logoutSuccessHandler((request, response, auth) -> {
