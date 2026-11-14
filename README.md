@@ -108,26 +108,44 @@ handyman-site/
 
 The model and repository packages contain documentation placeholders. The public homepage and single-admin authentication are implemented; gallery work remains for a later phase.
 
+## Local development login
+
+There are no built-in dev credentials. Run the backend from the `backend/` directory. With the `dev` profile (the default), it imports `backend/config/application-dev-local.yml` if present. The import is disabled whenever `prod` is active, including `dev,prod`.
+
+Generate a BCrypt hash using the interactive helper documented below, then create this local file yourself:
+
+```yaml
+local:
+  admin:
+    username: '<your local username>'
+    password-hash: '<your generated BCrypt hash>'
+```
+
+Store only the BCrypt hash, never the plaintext password. This file is gitignored; do not stage it. Check with `git check-ignore config/application-dev-local.yml` and `git diff --cached --name-only` from `backend/`. Restart the backend after changing it. Open `http://localhost:5173/admin/login` with both servers running.
+
+`ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH` override local values in dev. Missing or invalid credentials fail startup. Production reads these credentials strictly from environment variables; the local file is never a production fallback.
+
+If login fails after changing the file, restart the backend from `backend/` and confirm the active server is the rebuilt project. A server that was already running will retain its previously loaded credentials.
 ## Single-admin authentication
 
 Admin pages are available directly at `/admin/login` and `/admin`, with no public navigation links. They set a robots noindex meta tag; this is an indexing hint, while backend role checks enforce access.
 
-In `dev` only, missing credentials default to username `admin` and password `dev-admin-change-me`. Set both environment variables to override them. When `prod` is active (even alongside dev), both `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH` are mandatory; missing/blank values or a non-BCrypt hash abort startup. No users table or registration exists.
+Credentials are configured explicitly as described above. Production requires environment variables even if the dev profile is also active. No users table or registration exists.
 
-Generate a BCrypt hash locally from an interactive terminal. The helper prompts with hidden input; never supply a password in a command-line argument:
+Generate a BCrypt hash locally from an interactive terminal. The helper lives in test sources and is excluded from the production JAR. It prompts with hidden input; never supply a password in a command-line argument:
 
 ```powershell
 cd backend
-.\mvnw.cmd compile dependency:build-classpath '-Dmdep.outputFile=target/classpath.txt'
+.\mvnw.cmd test-compile dependency:build-classpath '-Dmdep.outputFile=target/classpath.txt'
 $dependencyClasspath = Get-Content target/classpath.txt -Raw
-java -cp "target/classes;$dependencyClasspath" com.handyman.config.PasswordHash
+java -cp "target/test-classes;$dependencyClasspath" com.handyman.config.PasswordHash
 ```
 
 On macOS/Linux:
 
 ```sh
-./mvnw compile dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
-java -cp "target/classes:$(cat target/classpath.txt)" com.handyman.config.PasswordHash
+./mvnw test-compile dependency:build-classpath -Dmdep.outputFile=target/classpath.txt
+java -cp "target/test-classes:$(cat target/classpath.txt)" com.handyman.config.PasswordHash
 ```
 
 Store the generated hash in your runtime secret manager as `ADMIN_PASSWORD_HASH`, and set `ADMIN_USERNAME`. For local PowerShell, assign the hash in single quotes so its dollar signs remain literal:
@@ -149,7 +167,7 @@ Security behavior:
 - Session cookies are HttpOnly, SameSite=Strict, cookie-only (no URL session IDs), and Secure in prod. Production requires HTTPS and a same-origin frontend/API. Sessions expire after 30 minutes of inactivity. Login changes any existing session ID; logout invalidates the session.
 - The CSRF cookie is readable by JavaScript, SameSite=Strict, and Secure in prod. It is separate from the HttpOnly session cookie.
 - Only the Vite dev origin has CORS access: GET for public APIs, and GET/POST plus credentials and the CSRF header for auth APIs. Admin requests use the Vite proxy; prod does not enable CORS.
-- Five failed credential attempts per connection IP within a rolling 15 minutes are allowed; subsequent attempts receive JSON 429 and Retry-After. Counts are in memory, per process, and reset on restart. Forwarded headers are not trusted. A reverse proxy must preserve distinct client IPs through trusted server configuration before deployment.
+- Five failed credential attempts per connection IP within a rolling 15 minutes are allowed; subsequent attempts receive JSON 429 and Retry-After. Success clears the failure count for that IP. Counts are in memory, per process, and reset on restart. Expired entries are evicted on each login attempt. At the hard cap of 10,000 tracked IPs, new IPs receive 429 until capacity is freed by expiry or a tracked IP logging in successfully; active limits are never evicted to admit new IPs. Forwarded headers are not trusted. A reverse proxy must preserve distinct client IPs through trusted server configuration before deployment.
 - Anonymous protected requests return JSON 401, forbidden/invalid CSRF requests JSON 403. There is no HTML login page or redirect.
 - Public API GET routes remain public, with admin routes and current-user lookup explicitly protected first. Other unmatched requests are denied.
 

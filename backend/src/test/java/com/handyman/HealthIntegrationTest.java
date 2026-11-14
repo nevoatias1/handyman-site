@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
-class HealthIntegrationTest {
+class HealthIntegrationTest extends TestCredentials {
     @Autowired
     private MockMvc mvc;
 

@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.*;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -26,14 +27,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    UserDetailsService adminUsers(Environment env) {
-        boolean dev = !env.matchesProfiles("prod") && env.matchesProfiles("dev");
-        String username = env.getProperty("ADMIN_USERNAME");
-        String hash = env.getProperty("ADMIN_PASSWORD_HASH");
-        if (dev) {
-            if (username == null || username.isBlank()) username = "admin";
-            if (hash == null || hash.isBlank()) hash = new BCryptPasswordEncoder(12).encode("dev-admin-change-me");
-        }
+    UserDetailsService adminUsers(ConfigurableEnvironment env) {
+        boolean prod = env.matchesProfiles("prod");
+        String username = prod ? (String) env.getSystemEnvironment().get("ADMIN_USERNAME")
+                : env.getProperty("ADMIN_USERNAME", env.getProperty("local.admin.username"));
+        String hash = prod ? (String) env.getSystemEnvironment().get("ADMIN_PASSWORD_HASH")
+                : env.getProperty("ADMIN_PASSWORD_HASH", env.getProperty("local.admin.password-hash"));
         if (username == null || username.isBlank() || hash == null || !hash.matches("\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}")) {
             throw new IllegalStateException("ADMIN_USERNAME and a valid BCrypt ADMIN_PASSWORD_HASH are required");
         }

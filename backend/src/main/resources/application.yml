@@ -13,6 +13,8 @@ logging:
 
 server:
   port: 8080
+  # In prod behind a trusted proxy, set server.forward-headers-strategy=native.
+  # Configure proxy trust at the container; application code uses getRemoteAddr() only.
   servlet:
     session:
       timeout: 30m
@@ -26,7 +28,8 @@ server:
 spring:
   config:
     activate:
-      on-profile: dev
+      on-profile: "dev & !prod"
+    import: optional:file:./config/application-dev-local.yml
   datasource:
     url: jdbc:h2:mem:handyman;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
