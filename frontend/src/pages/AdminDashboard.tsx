@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { api } from '../lib/api'
+import AdminGallery from '../components/AdminGallery'
 
 export default function AdminDashboard() {
   const { username } = useOutletContext<{username:string}>()
@@ -12,5 +13,5 @@ export default function AdminDashboard() {
     try { await api('/api/auth/logout', { method: 'POST' }); navigate('/admin/login', { replace: true }) }
     catch { setError('לא ניתן להתנתק כרגע'); setBusy(false) }
   }
-  return <section><h1>שלום, {username}</h1><p>אזור הניהול</p>{error && <p role="alert">{error}</p>}<button onClick={logout} disabled={busy}>התנתקות</button></section>
+  return <section><h1>שלום, {username}</h1><p>אזור הניהול</p>{error && <p role="alert">{error}</p>}<button onClick={logout} disabled={busy}>התנתקות</button><AdminGallery /></section>
 }

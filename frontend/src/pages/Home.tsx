@@ -1,5 +1,6 @@
 import { business, whatsappLink } from '../config/business'
 import ContactForm from '../components/ContactForm'
+import PublicGallery from '../components/PublicGallery'
 export default function Home() {
  return <>
   <section className="hero"><div className="container hero-inner"><div className="hero-content">
@@ -14,6 +15,7 @@ export default function Home() {
   </div></section>
   <section className="section about"><div className="container about-grid"><div><p className="eyebrow">נעים להכיר</p><h2>קצת עלינו</h2></div><p className="about-copy">{business.owner} הוא בעל {business.name}, ומציע שירותי אינסטלציה והנדימן ב{business.area}. עם {business.highlights[0]} ו{business.highlights[1]}, אפשר לפנות אליו לעבודות אינסטלציה, הרכבת רהיטים ותיקונים כלליים.</p></div></section>
   <section className="section area"><div className="container area-inner"><div className="area-icon" aria-hidden="true">⌖</div><div><p className="eyebrow">קרובים אליכם</p><h2>אזור השירות</h2><p>{business.area}</p></div></div></section>
+  <PublicGallery />
   <section className="section contact"><div className="container contact-inner"><div><p className="eyebrow">מדברים ומתקדמים</p><h2>צריכים עזרה בבית?</h2><p>ספרו לנו על העבודה ונשמח לשמוע מכם.</p></div><div><div className="actions"><a className="button button-white" href={business.phoneLink}>☎ <span dir="ltr">{business.phoneDisplay}</span></a><a className="button button-outline" href={whatsappLink} target="_blank" rel="noopener noreferrer">✆ שלחו הודעה בוואטסאפ</a></div><ContactForm /></div></div></section>
  </>
 }
