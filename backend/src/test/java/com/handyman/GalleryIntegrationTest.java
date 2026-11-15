@@ -24,21 +24,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class GalleryIntegrationTest extends TestCredentials {
  @TestConfiguration static class CloudMock {
   @Bean Uploader mockUploader() { return mock(Uploader.class); }
-  @Bean @Primary Cloudinary mockedCloudinary(Uploader uploader) {
+  @Bean Api mockAdminApi() { return mock(Api.class); }
+  @Bean @Primary Cloudinary mockedCloudinary(Uploader uploader,Api adminApi) {
    return new Cloudinary(Map.of("cloud_name","test-cloud","api_key","test-key","api_secret","test-secret")) {
     @Override public Uploader uploader() { return uploader; }
+    @Override public Api api() { return adminApi; }
    };
   }
  }
  @Autowired MockMvc mvc;
  @Autowired Uploader uploader;
+ @Autowired Api adminApi;
  @Autowired CategoryRepository categories;
  @Autowired PhotoRepository photos;
  MockHttpSession session;
  Cookie csrf;
  Long categoryId;
  @BeforeEach void setup() throws Exception {
-  reset(uploader);
+  reset(uploader,adminApi);
   when(uploader.upload(any(),anyMap())).thenAnswer(inv -> {
    Map options=inv.getArgument(1);
    return Map.of("public_id",options.get("folder")+"/"+options.get("public_id"));
@@ -150,5 +153,23 @@ class GalleryIntegrationTest extends TestCredentials {
   mvc.perform(delete("/api/admin/photos/"+p.id).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue()))
    .andExpect(status().isBadGateway());
   assertTrue(photos.existsById(p.id));
+ }
+ @Test void storageHealthIsAdminOnly() throws Exception {
+  mvc.perform(get("/api/admin/storage/health")).andExpect(status().isUnauthorized());
+  verifyNoInteractions(adminApi);
+ }
+ @Test void storageHealthSuccess() throws Exception {
+  var response=mock(com.cloudinary.api.ApiResponse.class);
+  when(response.get("status")).thenReturn("ok");
+  when(adminApi.ping(anyMap())).thenReturn(response);
+  mvc.perform(get("/api/admin/storage/health").session(session)).andExpect(status().isOk())
+   .andExpect(jsonPath("$.cloudinary").value("ok")).andExpect(jsonPath("$.cloudName").value("test-cloud"));
+ }
+ @Test void storageHealthFailureIsSanitized() throws Exception {
+  when(adminApi.ping(anyMap())).thenThrow(new Exception("HTTP status 401 api_secret=test-secret api_key=test-key signature=signed-value"));
+  var result=mvc.perform(get("/api/admin/storage/health").session(session)).andExpect(status().isBadGateway())
+   .andExpect(jsonPath("$.cloudinary").value("error")).andExpect(jsonPath("$.cloudName").value("test-cloud")).andReturn();
+  String body=result.getResponse().getContentAsString();
+  for(String value:List.of("test-secret","test-key","signed-value")) assertFalse(body.contains(value));
  }
 }

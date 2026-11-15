@@ -11,6 +11,13 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 
 @RestControllerAdvice
 public class GalleryErrors {
+ private final com.handyman.service.StorageDiagnostics diagnostics;
+ public GalleryErrors(com.handyman.service.StorageDiagnostics diagnostics) { this.diagnostics=diagnostics; }
+ @ExceptionHandler(Exception.class) ResponseEntity<?> unexpected(Exception ex,jakarta.servlet.http.HttpServletRequest request) throws Exception {
+  if (!request.getRequestURI().equals(request.getContextPath()+"/api/admin/photos") || !request.getMethod().equals("POST")) throw ex;
+  diagnostics.unexpected(ex);
+  return ResponseEntity.status(500).body(Map.of("message","אירעה שגיאה בהעלאת התמונות"));
+ }
  @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,org.springframework.web.servlet.NoHandlerFoundException.class}) ResponseEntity<?> notFound() { return ResponseEntity.status(404).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(Map.of("message","המשאב לא נמצא")); }
  @ExceptionHandler(GalleryException.class) ResponseEntity<?> gallery(GalleryException e) { return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage())); }
  @ExceptionHandler(MaxUploadSizeExceededException.class) ResponseEntity<?> oversized() { return ResponseEntity.status(413).body(Map.of("message","גודל תמונה מרבי הוא 10MB ועד 10 תמונות בבקשה")); }

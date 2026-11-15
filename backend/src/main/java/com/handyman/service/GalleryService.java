@@ -14,7 +14,8 @@ public class GalleryService {
  private final PhotoRepository photos;
  private final CloudinaryStorage storage;
  private final UploadValidator validator;
- public GalleryService(CategoryRepository c,PhotoRepository p,CloudinaryStorage s,UploadValidator v) { categories=c;photos=p;storage=s;validator=v; }
+ private final StorageDiagnostics diagnostics;
+ public GalleryService(CategoryRepository c,PhotoRepository p,CloudinaryStorage s,UploadValidator v,StorageDiagnostics d) { categories=c;photos=p;storage=s;validator=v;diagnostics=d; }
  private Category category(Long id) { return categories.lockById(id).orElseThrow(()->new GalleryException(404,"הקטגוריה לא נמצאה")); }
  private Photo photo(Long id) { return photos.findById(id).orElseThrow(()->new GalleryException(404,"התמונה לא נמצאה")); }
  private CategoryView view(Category c) { return new CategoryView(c.id,c.name,c.slug,c.sortOrder,c.createdAt); }
@@ -51,7 +52,7 @@ public class GalleryService {
    @Override public void afterCompletion(int status) {
     if(status!=STATUS_COMMITTED) for(String id:uploaded) {
      try { storage.delete(id); } catch(RuntimeException ex) {
-      org.slf4j.LoggerFactory.getLogger(GalleryService.class).warn("Gallery rollback cleanup failed for public ID {}; remote asset requires reconciliation",id);
+      diagnostics.warn("rollback cleanup",ex);
      }
     }
    }
