@@ -62,11 +62,21 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 0
   jpa:
     hibernate:
       ddl-auto: validate
 
 server:
+  port: ${PORT:10000}
+  address: 0.0.0.0
+  forward-headers-strategy: native
+  tomcat:
+    threads:
+      max: 30
+      min-spare: 2
   servlet:
     session:
       cookie:

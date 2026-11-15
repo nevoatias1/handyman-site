@@ -77,7 +77,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
                 .requestMatchers("/api/auth/login", "/api/auth/logout", "/error").permitAll()
-                .anyRequest().denyAll())
+                .requestMatchers(HttpMethod.GET, "/**").permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/**").permitAll()
+.anyRequest().denyAll())
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, ex) -> error(response, 401, "נדרשת התחברות"))
                 .accessDeniedHandler((request, response, ex) -> {

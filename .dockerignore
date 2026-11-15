@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+**/target
+.git
+.tools
+**/.env*
+**/config/application-dev-local.yml
+**/application-local.*
+**/application-dev-local.*
+**/*.log
+.idea
+.vscode
+**/*.iml

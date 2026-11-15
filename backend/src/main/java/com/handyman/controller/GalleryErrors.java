@@ -11,6 +11,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 
 @RestControllerAdvice
 public class GalleryErrors {
+ @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,org.springframework.web.servlet.NoHandlerFoundException.class}) ResponseEntity<?> notFound() { return ResponseEntity.status(404).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(Map.of("message","המשאב לא נמצא")); }
  @ExceptionHandler(GalleryException.class) ResponseEntity<?> gallery(GalleryException e) { return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage())); }
  @ExceptionHandler(MaxUploadSizeExceededException.class) ResponseEntity<?> oversized() { return ResponseEntity.status(413).body(Map.of("message","גודל תמונה מרבי הוא 10MB ועד 10 תמונות בבקשה")); }
  @ExceptionHandler(DataIntegrityViolationException.class) ResponseEntity<?> conflict() { return ResponseEntity.status(409).body(Map.of("message","הפעולה מתנגשת בנתונים קיימים")); }
