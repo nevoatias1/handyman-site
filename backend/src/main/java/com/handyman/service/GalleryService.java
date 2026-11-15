@@ -66,9 +66,9 @@ public class GalleryService {
   }
   return result;
  }
- public PhotoView caption(Long id,Caption input) { Photo p=photo(id);category(p.category.id);p.caption=input.caption()==null?null:input.caption().trim();return view(p); }
+ public PhotoView caption(Long id,Caption input) { Photo p=photo(id);category(p.category.getId());p.caption=input.caption()==null?null:input.caption().trim();return view(p); }
  public void deletePhoto(Long id) {
-  Photo p=photo(id);category(p.category.id);
+  Photo p=photo(id);category(p.category.getId());
   storage.delete(p.cloudinaryPublicId);photos.delete(p);photos.flush();
  }
  public void orderPhotos(Long categoryId,List<Long> ids) {

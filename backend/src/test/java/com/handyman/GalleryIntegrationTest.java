@@ -37,6 +37,8 @@ class GalleryIntegrationTest extends TestCredentials {
  @Autowired Api adminApi;
  @Autowired CategoryRepository categories;
  @Autowired PhotoRepository photos;
+ @Autowired jakarta.persistence.EntityManager entityManager;
+ @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
  MockHttpSession session;
  Cookie csrf;
  Long categoryId;
@@ -171,5 +173,34 @@ class GalleryIntegrationTest extends TestCredentials {
    .andExpect(jsonPath("$.cloudinary").value("error")).andExpect(jsonPath("$.cloudName").value("test-cloud")).andReturn();
   String body=result.getResponse().getContentAsString();
   for(String value:List.of("test-secret","test-key","signed-value")) assertFalse(body.contains(value));
+ }
+ @Test void uploadRefreshThenEditCaptionWithFrontendRequest() throws Exception {
+  var uploaded=mvc.perform(multipart("/api/admin/photos").file(image()).session(session).cookie(csrf)
+   .header("X-XSRF-TOKEN",csrf.getValue()).param("categoryId",categoryId.toString()))
+   .andExpect(status().isOk()).andReturn();
+  long id=json.readTree(uploaded.getResponse().getContentAsString()).get(0).get("id").asLong();
+  assertTrue(id>0);
+  entityManager.flush();entityManager.clear();
+  var refreshed=mvc.perform(get("/api/photos").param("category","plumbing"))
+   .andExpect(status().isOk()).andReturn();
+  long serverId=json.readTree(refreshed.getResponse().getContentAsString()).get(0).get("id").asLong();
+  assertEquals(id,serverId);
+  entityManager.clear();
+  var freshCsrf=mvc.perform(get("/api/auth/csrf").session(session)).andReturn().getResponse();
+  String token=json.readTree(freshCsrf.getContentAsString()).get("token").asText();
+  mvc.perform(patch("/api/admin/photos/"+serverId).session(session).cookie(new Cookie("XSRF-TOKEN",token))
+   .header("X-XSRF-TOKEN",token).header("Origin","http://localhost:5173").accept("application/json")
+   .contentType("application/json").content(json.writeValueAsString(Map.of("caption","תיקון צינור במטבח"))))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id))
+   .andExpect(jsonPath("$.caption").value("תיקון צינור במטבח"));
+  entityManager.flush();entityManager.clear();
+  assertEquals("תיקון צינור במטבח",photos.findById(id).orElseThrow().caption);
+ }
+ @Test void missingPhotoCaptionIsHebrewJson404() throws Exception {
+  mvc.perform(patch("/api/admin/photos/9223372036854775807").session(session).cookie(csrf)
+   .header("X-XSRF-TOKEN",csrf.getValue()).accept("application/json")
+   .contentType("application/json").content("{\"caption\":\"בדיקה\"}"))
+   .andExpect(status().isNotFound()).andExpect(content().contentTypeCompatibleWith("application/json"))
+   .andExpect(jsonPath("$.message").value("התמונה לא נמצאה"));
  }
 }

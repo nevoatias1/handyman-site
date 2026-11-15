@@ -8,4 +8,6 @@ public class Category {
  @Column(nullable=false,unique=true,length=100) public String slug;
  @Column(nullable=false) public int sortOrder;
  @Column(nullable=false,updatable=false) public Instant createdAt = Instant.now();
+ // Access identifiers through a method so Hibernate lazy proxies can resolve them.
+ public Long getId() { return id; }
 }
