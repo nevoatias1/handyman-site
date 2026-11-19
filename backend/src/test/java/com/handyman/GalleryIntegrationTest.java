@@ -54,7 +54,7 @@ class GalleryIntegrationTest extends TestCredentials {
    .contentType("application/json").content("{\"username\":\"test-admin\",\"password\":\""+TEST_PASSWORD+"\"}"))
    .andExpect(status().isOk()).andReturn().getRequest().getSession();
   csrf=mvc.perform(get("/api/auth/csrf").session(session)).andReturn().getResponse().getCookie("XSRF-TOKEN");
-  categoryId=categories.findBySlug("plumbing").orElseThrow().id;
+  categoryId=categories.findBySlug("plumbing").orElseThrow().getId();
  }
  MockMultipartFile image() { return new MockMultipartFile("files","client.jpg","image/jpeg",new byte[]{(byte)255,(byte)216,(byte)255,1}); }
  @Test void publicEndpointsAndSeedWorkAnonymously() throws Exception {
@@ -94,23 +94,25 @@ class GalleryIntegrationTest extends TestCredentials {
   mvc.perform(multipart("/api/admin/photos").file(image()).session(session).cookie(csrf)
    .header("Origin","http://localhost:5173")
    .header("X-XSRF-TOKEN",csrf.getValue()).param("categoryId",categoryId.toString())).andExpect(status().isOk())
-   .andExpect(jsonPath("$[0].url").value(org.hamcrest.Matchers.containsString("f_auto")))
+   .andExpect(jsonPath("$[0].url").value(org.hamcrest.Matchers.containsString("strip_profile")))
    .andExpect(jsonPath("$[0].thumbUrl").value(org.hamcrest.Matchers.containsString("w_600")));
   var options=org.mockito.ArgumentCaptor.forClass(Map.class);
   verify(uploader).upload(any(),options.capture());
   assertEquals("handyman-site/plumbing",options.getValue().get("folder"));
   assertFalse(options.getValue().get("public_id").toString().contains("client"));
+  assertTrue(options.getValue().get("transformation").toString().contains("force_strip"));
+  assertTrue(options.getValue().get("transformation").toString().contains("strip_profile"));
   assertTrue(options.getValue().get("transformation").toString().contains("c_limit"));
   assertTrue(options.getValue().get("transformation").toString().contains("w_2000"));
   mvc.perform(get("/api/photos").param("category","plumbing")).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
   Photo p=photos.findByCategoryIdOrderBySortOrderAscIdAsc(categoryId).getFirst();
-  mvc.perform(delete("/api/admin/photos/"+p.id).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue()))
+  mvc.perform(delete("/api/admin/photos/"+p.getId()).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue()))
    .andExpect(status().isOk());
-  verify(uploader).destroy(eq(p.cloudinaryPublicId),anyMap());
-  assertFalse(photos.existsById(p.id));
+  verify(uploader).destroy(eq(p.getCloudinaryPublicId()),anyMap());
+  assertFalse(photos.existsById(p.getId()));
  }
  @Test void categoryWithPhotosReturns409() throws Exception {
-  Photo p=new Photo();p.category=categories.findById(categoryId).orElseThrow();p.cloudinaryPublicId="test-photo";
+  Photo p=new Photo();p.setCategory(categories.findById(categoryId).orElseThrow());p.setCloudinaryPublicId("test-photo");
   photos.saveAndFlush(p);
   mvc.perform(delete("/api/admin/categories/"+categoryId).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue()))
    .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("לא ניתן למחוק קטגוריה המכילה תמונות"));
@@ -120,41 +122,41 @@ class GalleryIntegrationTest extends TestCredentials {
    .contentType("application/json").content("{\"name\":\"בדיקה\",\"slug\":\"test-category\"}"))
    .andExpect(status().isOk());
   Category c=categories.findBySlug("test-category").orElseThrow();
-  mvc.perform(patch("/api/admin/categories/"+c.id).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
+  mvc.perform(patch("/api/admin/categories/"+c.getId()).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
    .contentType("application/json").content("{\"name\":\"שם חדש\"}"))
    .andExpect(status().isOk()).andExpect(jsonPath("$.slug").value("test-category"));
-  var ids=new ArrayList<>(categories.findAllByOrderBySortOrderAscIdAsc().stream().map(x->x.id).toList());
+  var ids=new ArrayList<>(categories.findAllByOrderBySortOrderAscIdAsc().stream().map(x->x.getId()).toList());
   Collections.reverse(ids);
   mvc.perform(put("/api/admin/categories/reorder").session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
    .contentType("application/json").content("{\"ids\":"+ids+"}"))
    .andExpect(status().isOk());
-  assertEquals(c.id,categories.findAllByOrderBySortOrderAscIdAsc().getFirst().id);
-  mvc.perform(delete("/api/admin/categories/"+c.id).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue()))
+  assertEquals(c.getId(),categories.findAllByOrderBySortOrderAscIdAsc().getFirst().getId());
+  mvc.perform(delete("/api/admin/categories/"+c.getId()).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue()))
    .andExpect(status().isOk());
  }
  @Test void photoCaptionAndOrderValidation() throws Exception {
-  Photo p=new Photo();p.category=categories.findById(categoryId).orElseThrow();p.cloudinaryPublicId="caption-test";
+  Photo p=new Photo();p.setCategory(categories.findById(categoryId).orElseThrow());p.setCloudinaryPublicId("caption-test");
   photos.saveAndFlush(p);
-  mvc.perform(patch("/api/admin/photos/"+p.id).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
+  mvc.perform(patch("/api/admin/photos/"+p.getId()).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
    .contentType("application/json").content("{\"caption\":\"תיקון בבית\"}"))
    .andExpect(status().isOk()).andExpect(jsonPath("$.caption").value("תיקון בבית"));
-  mvc.perform(patch("/api/admin/photos/"+p.id).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
+  mvc.perform(patch("/api/admin/photos/"+p.getId()).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
    .contentType("application/json").content("{\"caption\":\""+"x".repeat(201)+"\"}"))
    .andExpect(status().isBadRequest());
   mvc.perform(put("/api/admin/categories/"+categoryId+"/photos/reorder").session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
    .contentType("application/json").content("{\"ids\":[]}"))
    .andExpect(status().isBadRequest());
   mvc.perform(put("/api/admin/categories/"+categoryId+"/photos/reorder").session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue())
-   .contentType("application/json").content("{\"ids\":["+p.id+"]}"))
+   .contentType("application/json").content("{\"ids\":["+p.getId()+"]}"))
    .andExpect(status().isOk());
  }
  @Test void cloudFailureDoesNotDeleteDatabaseRow() throws Exception {
-  Photo p=new Photo();p.category=categories.findById(categoryId).orElseThrow();p.cloudinaryPublicId="retained";
+  Photo p=new Photo();p.setCategory(categories.findById(categoryId).orElseThrow());p.setCloudinaryPublicId("retained");
   photos.saveAndFlush(p);
   when(uploader.destroy(anyString(),anyMap())).thenThrow(new java.io.IOException("mock failure"));
-  mvc.perform(delete("/api/admin/photos/"+p.id).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue()))
+  mvc.perform(delete("/api/admin/photos/"+p.getId()).session(session).cookie(csrf).header("X-XSRF-TOKEN",csrf.getValue()))
    .andExpect(status().isBadGateway());
-  assertTrue(photos.existsById(p.id));
+  assertTrue(photos.existsById(p.getId()));
  }
  @Test void storageHealthIsAdminOnly() throws Exception {
   mvc.perform(get("/api/admin/storage/health")).andExpect(status().isUnauthorized());
@@ -194,7 +196,7 @@ class GalleryIntegrationTest extends TestCredentials {
    .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id))
    .andExpect(jsonPath("$.caption").value("תיקון צינור במטבח"));
   entityManager.flush();entityManager.clear();
-  assertEquals("תיקון צינור במטבח",photos.findById(id).orElseThrow().caption);
+  assertEquals("תיקון צינור במטבח",photos.findById(id).orElseThrow().getCaption());
  }
  @Test void missingPhotoCaptionIsHebrewJson404() throws Exception {
   mvc.perform(patch("/api/admin/photos/9223372036854775807").session(session).cookie(csrf)

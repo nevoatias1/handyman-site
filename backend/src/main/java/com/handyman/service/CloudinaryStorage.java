@@ -21,7 +21,7 @@ public class CloudinaryStorage {
    Map result = cloud.uploader().upload(file.getBytes(), Map.of(
     "folder","handyman-site/"+slug,"public_id",UUID.randomUUID().toString(),
     "resource_type","image","overwrite",false,
-    "transformation",new Transformation().width(2000).height(2000).crop("limit")));
+    "transformation",new Transformation().width(2000).height(2000).crop("limit").flags("force_strip", "strip_profile")));
    Object id = result.get("public_id");
    if (!(id instanceof String value) || value.isBlank()) throw new IOException();
    return value;
@@ -36,7 +36,7 @@ public class CloudinaryStorage {
  }
  public String url(String id,boolean thumbnail) {
   if (cloud.config.cloudName==null) throw new GalleryException(503,"שירות התמונות אינו מוגדר");
-  Transformation t = new Transformation().fetchFormat("auto").quality("auto");
+  Transformation t = new Transformation().fetchFormat("auto").quality("auto").flags("strip_profile");
   if (thumbnail) t.width(600).crop("limit");
   return cloud.url().secure(true).transformation(t).generate(id);
  }

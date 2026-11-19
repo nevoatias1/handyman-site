@@ -26,4 +26,21 @@ class StorageDiagnosticsTest {
   assertFalse(safe.contains("abcdef0123456789abcdef0123456789abcdef0123"));
   assertFalse(safe.contains("folder=internal"));
  }
+
+ @Test void stripsDatabaseUrlsAndTokens() {
+  String safe=diagnostics.sanitize("jdbc:postgresql://user:db-secret@host/database password=db-secret token=csrf-secret");
+  assertFalse(safe.contains("db-secret"));assertFalse(safe.contains("csrf-secret"));
+  assertFalse(safe.contains("jdbc:postgresql"));
+ }
+ @Test void unexpectedStackTraceOmitsCustomerPayload() {
+  var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(StorageDiagnostics.class);
+  var appender=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+  appender.start();logger.addAppender(appender);
+  try {
+   diagnostics.unexpected(new IllegalStateException("customer-private-name customer-private-phone"));
+   var trace=appender.list.getLast().getThrowableProxy();
+   assertFalse(trace.getMessage().contains("customer-private"));
+   assertTrue(trace.getStackTraceElementProxyArray().length>0);
+  } finally { logger.detachAppender(appender);appender.stop(); }
+ }
 }

@@ -66,8 +66,14 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain security(HttpSecurity http, CookieCsrfTokenRepository csrf,
-            HttpSessionSecurityContextRepository contexts) throws Exception {
-        http.cors(cors -> {})
+            HttpSessionSecurityContextRepository contexts, Environment env) throws Exception {
+        http.headers(headers -> {
+            headers.frameOptions(frame -> frame.deny());
+            headers.referrerPolicy(policy -> policy.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER));
+            headers.permissionsPolicy(policy -> policy.policy("camera=(), microphone=(), geolocation=()"));
+            headers.httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31536000).includeSubDomains(false));
+            if (env.matchesProfiles("prod")) headers.contentSecurityPolicy(csp -> csp.policyDirectives(SecurityHeaders.policy()));
+        }).cors(cors -> {})
             .csrf(config -> config.csrfTokenRepository(csrf)
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
             .securityContext(config -> config.securityContextRepository(contexts))

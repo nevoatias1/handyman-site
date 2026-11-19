@@ -3,6 +3,11 @@ spring:
     name: handyman-backend
   profiles:
     default: dev
+  h2:
+    console:
+      enabled: false
+  mvc:
+    log-request-details: false
   jpa:
     open-in-view: false
   servlet:
@@ -13,12 +18,21 @@ spring:
 
 logging:
   level:
+    root: INFO
+    org.hibernate.SQL: OFF
+    org.hibernate.orm.jdbc.bind: OFF
+    com.zaxxer.hikari: WARN
     org.springframework.web: INFO
     org.springframework.security: INFO
     com.cloudinary: INFO
     org.apache.hc: INFO
 
 server:
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
   port: 8080
   tomcat:
     max-part-count: 11

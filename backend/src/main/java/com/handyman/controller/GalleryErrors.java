@@ -14,7 +14,7 @@ public class GalleryErrors {
  private final com.handyman.service.StorageDiagnostics diagnostics;
  public GalleryErrors(com.handyman.service.StorageDiagnostics diagnostics) { this.diagnostics=diagnostics; }
  @ExceptionHandler(Exception.class) ResponseEntity<?> unexpected(Exception ex,jakarta.servlet.http.HttpServletRequest request) throws Exception {
-  if (!request.getRequestURI().equals(request.getContextPath()+"/api/admin/photos") || !request.getMethod().equals("POST")) throw ex;
+
   diagnostics.unexpected(ex);
   return ResponseEntity.status(500).body(Map.of("message","אירעה שגיאה בהעלאת התמונות"));
  }

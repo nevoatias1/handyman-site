@@ -29,3 +29,7 @@ coverage/
 .settings/
 .DS_Store
 Thumbs.db
+
+.security/
+**/application-local.*
+**/application-dev-local.*

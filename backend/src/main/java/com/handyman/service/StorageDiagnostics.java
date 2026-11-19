@@ -25,7 +25,8 @@ public class StorageDiagnostics {
    Base64.getEncoder().encodeToString((cloud.config.apiKey+":"+cloud.config.apiSecret).getBytes(StandardCharsets.UTF_8)),"[redacted]");
   text=text.replaceAll("(?i)(?:cloudinary|https?)://[^\\s\\x22'<>]+","[URL redacted]");
   text=text.replaceAll("(?is)\\b(?:request|request_body|request_headers)\\s*[:=].*","[request redacted]");
-  text=text.replaceAll("(?i)([\\x22']?(?:api[_-]?key|api[_-]?secret|cloudinary_url|signature|authorization)[\\x22']?\\s*[:=]\\s*)(?:\\x22[^\\x22]*\\x22|'[^']*'|[^\\s,;}]+)","$1[redacted]");
+  text=text.replaceAll("(?i)([\\x22']?(?:api[_-]?key|api[_-]?secret|cloudinary_url|signature|authorization|password|password_hash|admin_password_hash|db_password|token|x-xsrf-token)[\\x22']?\\s*[:=]\\s*)(?:\\x22[^\\x22]*\\x22|'[^']*'|[^\\s,;}]+)","$1[redacted]");
+  text=text.replaceAll("(?i)jdbc:[^\\s\\x22'<>]+","[database URL redacted]");
   text=text.replaceAll("(?is)string to sign.*","[signing input redacted]");
   text=text.replaceAll("(?i)\\b[0-9a-f]{40,64}\\b","[signature redacted]");
   text=text.replaceAll("[\\r\\n\\t\\p{Cntrl}]"," ");
@@ -55,7 +56,7 @@ public class StorageDiagnostics {
  }
  private Throwable safeTrace(Throwable ex,Map<Throwable,Boolean> seen,int depth) {
   if(depth>8 || seen.put(ex,true)!=null) return new RuntimeException("[cause chain truncated]");
-  var safe=new RuntimeException(ex.getClass().getName()+": "+sanitize(ex.getMessage()));
+  var safe=new RuntimeException(ex.getClass().getName()+": [exception payload omitted to protect customer data]");
   safe.setStackTrace(Arrays.stream(ex.getStackTrace()).map(frame -> new StackTraceElement(
    sanitize(frame.getClassName()),sanitize(frame.getMethodName()),frame.getFileName()==null?null:sanitize(frame.getFileName()),frame.getLineNumber())).toArray(StackTraceElement[]::new));
   if(ex.getCause()!=null) safe.initCause(safeTrace(ex.getCause(),seen,depth+1));
